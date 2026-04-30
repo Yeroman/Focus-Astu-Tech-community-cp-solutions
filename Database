@@ -1,0 +1,144 @@
+(::
+CREATE DATABASE BankDB;
+USE BankDB;
+
+CREATE TABLE Customerdb (
+    customer_id INT PRIMARY KEY AUTO_INCREMENT,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    dob DATE,
+    phone VARCHAR(15),
+    email VARCHAR(100),
+    address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Accountdb (
+    account_id INT PRIMARY KEY AUTO_INCREMENT,
+    customer_id INT,
+    account_type VARCHAR(20),
+    balance DECIMAL(15,2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customerdb(customer_id)
+);
+
+CREATE TABLE Transactiondb (
+    transaction_id INT PRIMARY KEY AUTO_INCREMENT,
+    account_id INT,
+    transaction_type VARCHAR(20),
+    amount DECIMAL(15,2),
+    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    description TEXT,
+    FOREIGN KEY (account_id) REFERENCES Accountdb(account_id)
+);
+
+CREATE TABLE Transferdb (
+    transfer_id INT PRIMARY KEY AUTO_INCREMENT,
+    from_account INT,
+    to_account INT,
+    amount DECIMAL(15,2),
+    transfer_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (from_account) REFERENCES Accountdb(account_id),
+    FOREIGN KEY (to_account) REFERENCES Accountdb(account_id)
+);
+
+INSERT INTO Customerdb (first_name, last_name, dob, phone, email, address)
+VALUES
+('David', 'Kebede', '1997-06-23', '091142678', 'david@example.com', 'Addis Ababa'),
+('Abel', 'Ayele', '1991-05-05', '0913654678', 'abel@example.com', 'Adama'),
+('Abebe', 'Girma', '1996-04-25', '0912378412', 'abebe@example.com', 'Addis Ababa'),
+('Helen', 'Abera', '1995-03-15', '0956345213', 'helen@example.com', 'Hawasa'),
+('Sara', 'Tesfaye', '1998-03-22', '0923456789', 'sara@example.com', 'Adama');
+
+INSERT INTO Accountdb (customer_id, account_type, balance)
+VALUES
+(1, 'Savings', 1000),
+(2, 'Savings', 2000),
+(3, 'Savings', 1500),
+(4, 'Savings', 500),
+(5, 'Savings', 2500);
+
+-- Deposit 
+START TRANSACTION;
+
+UPDATE Accountdb
+SET balance = balance + 500
+WHERE account_id = 1;
+
+INSERT INTO Transactiondb (account_id, transaction_type, amount, description)
+VALUES (1, 'Deposit', 500, 'Cash deposit');
+
+COMMIT;
+
+-- Withdraw
+START TRANSACTION;
+
+UPDATE Accountdb
+SET balance = balance - 300
+WHERE account_id = 1 AND balance >= 300;
+
+INSERT INTO Transactiondb (account_id, transaction_type, amount, description)
+VALUES (1, 'Withdrawal', 300, 'ATM withdrawal');
+
+COMMIT;
+
+-- Transfer
+START TRANSACTION;
+
+-- Deduct from sender
+UPDATE Accountdb
+SET balance = balance - 400
+WHERE account_id = 1 AND balance >= 400;
+
+-- Add to receiver
+UPDATE Accountdb
+SET balance = balance + 400
+WHERE account_id = 2;
+
+-- Record transfer
+INSERT INTO Transferdb (from_account, to_account, amount)
+VALUES (1, 2, 400);
+
+COMMIT;
+
+-- add new customer
+INSERT INTO Customerdb (first_name, last_name, dob, phone, email, address)
+VALUES ('Abel', 'Mekonnen', '1992-08-10', '0934567890', 'abel@email.com', 'Addis Ababa');
+
+-- add new account
+INSERT INTO Accountdb (customer_id, account_type, balance)
+VALUES (LAST_INSERT_ID(), 'Savings', 1500);
+
+SELECT 
+    a.account_id,
+    c.first_name,
+    c.last_name,
+    a.balance
+FROM Accountdb a
+JOIN Customerdb c ON a.customer_id = c.customer_id;
+
+-- to see transfer records
+SELECT 
+    tr.transfer_id,
+    c1.first_name AS sender_name,
+    c2.first_name AS receiver_name,
+    tr.amount
+FROM Transferdb tr
+JOIN Accountdb a1 ON tr.from_account = a1.account_id
+JOIN Customerdb c1 ON a1.customer_id = c1.customer_id
+JOIN Accountdb a2 ON tr.to_account = a2.account_id
+JOIN Customerdb c2 ON a2.customer_id = c2.customer_id;
+
+-- to add multiple customers
+INSERT INTO Customerdb (first_name, last_name, dob, phone, email, address)
+VALUES
+('bini', 'Mekonnen', '1992-08-10', '0934567850', 'bini@email.com', 'Addis Ababa'),
+('Liya', 'Bekele', '1996-11-05', '0945678901', 'liya@email.com', 'Adama'),
+('Noah', 'Tesfaye', '1990-02-14', '0956789012', 'noah@email.com', 'Hawassa');
+
+-- to add multiple accounts
+INSERT INTO Accountdb (customer_id, account_type, balance)
+SELECT customer_id, 'Savings', 1000
+FROM Customerdb
+WHERE email IN ('bini@email.com', 'liya@email.com', 'noah@email.com');
